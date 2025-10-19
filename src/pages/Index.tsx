@@ -3,18 +3,66 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
+import funcUrls from '../../backend/func2url.json';
+
+interface WebsiteData {
+  title: string;
+  description: string;
+  sections: Array<{
+    type: string;
+    title: string;
+    content: string;
+    items?: string[];
+  }>;
+  colorScheme: {
+    primary: string;
+    secondary: string;
+    background: string;
+  };
+}
 
 export default function Index() {
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedWebsite, setGeneratedWebsite] = useState<WebsiteData | null>(null);
+  const { toast } = useToast();
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!prompt.trim()) return;
+    
     setIsGenerating(true);
-    setTimeout(() => {
+    
+    try {
+      const response = await fetch(funcUrls['generate-site'], {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка генерации сайта');
+      }
+      
+      setGeneratedWebsite(data.website);
+      toast({
+        title: '✅ Сайт создан!',
+        description: `"${data.website.title}" готов к просмотру`,
+      });
+    } catch (error) {
+      toast({
+        title: '❌ Ошибка',
+        description: error instanceof Error ? error.message : 'Не удалось создать сайт',
+        variant: 'destructive',
+      });
+    } finally {
       setIsGenerating(false);
-    }, 3000);
+    }
   };
 
   return (
@@ -126,13 +174,80 @@ export default function Index() {
 
         <div className="relative max-w-5xl mx-auto">
           <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl blur-2xl opacity-20"></div>
-          <div className="relative rounded-2xl overflow-hidden border-4 border-white shadow-2xl">
-            <img
-              src="https://cdn.poehali.dev/projects/b7f7b2d5-b36c-4ecd-924a-51eec76a70ee/files/70e2bf45-fe31-4622-b86d-55a206427bd7.jpg"
-              alt="AI Website Builder Interface"
-              className="w-full h-auto"
-            />
-          </div>
+          {generatedWebsite ? (
+            <div className="relative rounded-2xl overflow-hidden border-4 border-white shadow-2xl bg-white p-8">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-3xl font-bold mb-2">{generatedWebsite.title}</h2>
+                  <p className="text-muted-foreground">{generatedWebsite.description}</p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setGeneratedWebsite(null)}
+                >
+                  <Icon name="X" size={16} className="mr-2" />
+                  Закрыть
+                </Button>
+              </div>
+              
+              <div className="space-y-6">
+                {generatedWebsite.sections.map((section, index) => (
+                  <Card key={index}>
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Badge variant="outline">{section.type}</Badge>
+                        <h3 className="text-xl font-bold">{section.title}</h3>
+                      </div>
+                      <p className="text-muted-foreground mb-4">{section.content}</p>
+                      {section.items && section.items.length > 0 && (
+                        <ul className="list-disc list-inside space-y-1">
+                          {section.items.map((item, i) => (
+                            <li key={i} className="text-sm">{item}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                <p className="text-sm font-semibold mb-2">Цветовая схема:</p>
+                <div className="flex gap-4">
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-8 h-8 rounded border"
+                      style={{ backgroundColor: generatedWebsite.colorScheme.primary }}
+                    />
+                    <span className="text-sm">Primary: {generatedWebsite.colorScheme.primary}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-8 h-8 rounded border"
+                      style={{ backgroundColor: generatedWebsite.colorScheme.secondary }}
+                    />
+                    <span className="text-sm">Secondary: {generatedWebsite.colorScheme.secondary}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-8 h-8 rounded border"
+                      style={{ backgroundColor: generatedWebsite.colorScheme.background }}
+                    />
+                    <span className="text-sm">Background: {generatedWebsite.colorScheme.background}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="relative rounded-2xl overflow-hidden border-4 border-white shadow-2xl">
+              <img
+                src="https://cdn.poehali.dev/projects/b7f7b2d5-b36c-4ecd-924a-51eec76a70ee/files/70e2bf45-fe31-4622-b86d-55a206427bd7.jpg"
+                alt="AI Website Builder Interface"
+                className="w-full h-auto"
+              />
+            </div>
+          )}
         </div>
       </section>
 
