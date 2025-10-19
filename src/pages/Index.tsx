@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -28,6 +29,7 @@ export default function Index() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedWebsite, setGeneratedWebsite] = useState<WebsiteData | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -88,6 +90,10 @@ export default function Index() {
               <a href="#pricing" className="text-sm font-medium hover:text-primary transition">
                 Тарифы
               </a>
+              <Button variant="outline" size="sm" onClick={() => navigate('/game')}>
+                <Icon name="Gamepad2" size={16} className="mr-2" />
+                Игра
+              </Button>
               <Button variant="outline" size="sm">
                 Войти
               </Button>
