@@ -1,5 +1,5 @@
 '''
-Business: AI-генерация кода для проектов через Anthropic Claude API
+Business: AI-генерация кода для проектов через OpenAI GPT-4 API
 Args: event - dict с httpMethod, body (prompt, project_id, action)
       context - object с request_id
 Returns: Сгенерированный код или список файлов
@@ -152,13 +152,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         project_context = get_project_context(project_id)
         
-        anthropic_key = os.environ.get('ANTHROPIC_API_KEY')
+        openai_key = os.environ.get('OPENAI_API_KEY')
         
-        if anthropic_key and anthropic_key.startswith('sk-ant-'):
+        if openai_key and openai_key.startswith('sk-'):
             try:
-                import anthropic
+                from openai import OpenAI
                 
-                client = anthropic.Anthropic(api_key=anthropic_key)
+                client = OpenAI(api_key=openai_key)
                 
                 system_prompt = """Ты опытный React/TypeScript разработчик. 
 Твоя задача - генерировать чистый, современный код компонентов.
@@ -167,23 +167,26 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 1. Используй TypeScript с интерфейсами для props
 2. Используй Tailwind CSS для стилей
 3. Код должен быть готов к использованию
-4. Не добавляй лишних комментариев
+4. Не добавляй комментариев
 5. Экспортируй компонент как default
-6. Возвращай ТОЛЬКО код, без markdown блоков"""
+6. Возвращай ТОЛЬКО код, без markdown блоков (```tsx)"""
 
-                message = client.messages.create(
-                    model="claude-3-5-sonnet-20241022",
-                    max_tokens=2000,
-                    system=system_prompt,
+                response = client.chat.completions.create(
+                    model="gpt-4",
                     messages=[
-                        {
-                            "role": "user",
-                            "content": f"{project_context}\n\nЗапрос: {prompt}\n\nСоздай React компонент."
-                        }
-                    ]
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"{project_context}\n\nЗапрос: {prompt}\n\nСоздай React компонент."}
+                    ],
+                    max_tokens=2000,
+                    temperature=0.7
                 )
                 
-                generated_code = message.content[0].text
+                generated_code = response.choices[0].message.content
+                
+                if generated_code.startswith('```'):
+                    lines = generated_code.split('\n')
+                    generated_code = '\n'.join(lines[1:-1]) if len(lines) > 2 else generated_code
+                
                 component_name = generate_component_name(prompt)
                 
                 return {
@@ -192,11 +195,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'body': json.dumps({
                         'component_name': component_name,
                         'file_path': f'src/components/{component_name}.tsx',
-                        'content': generated_code,
+                        'content': generated_code.strip(),
                         'file_type': 'component',
                         'tokens': {
-                            'input': message.usage.input_tokens,
-                            'output': message.usage.output_tokens
+                            'input': response.usage.prompt_tokens,
+                            'output': response.usage.completion_tokens
                         }
                     }),
                     'isBase64Encoded': False
@@ -213,7 +216,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 }
         else:
             result = generate_code_without_api(prompt, project_context)
-            result['warning'] = 'ANTHROPIC_API_KEY not set, used template'
+            result['warning'] = 'OPENAI_API_KEY not set, used template'
             
             return {
                 'statusCode': 200,

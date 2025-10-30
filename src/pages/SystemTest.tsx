@@ -478,7 +478,34 @@ function SystemTest() {
                       <Icon name="Sparkles" size={18} className="text-white" />
                     </div>
                     AI Ассистент
+                    <span className="ml-auto text-xs text-slate-400 font-normal">GPT-4</span>
                   </h3>
+                  
+                  <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                    <div className="flex items-start gap-3">
+                      <Icon name="Key" size={18} className="text-blue-400 mt-0.5" />
+                      <div className="flex-1 space-y-2">
+                        <p className="text-sm text-blue-300 font-medium">OpenAI API Key</p>
+                        <Input
+                          type="password"
+                          placeholder="sk-proj-..."
+                          className="bg-black/30 border-blue-500/30 text-white placeholder:text-slate-500 text-sm"
+                          onChange={(e) => {
+                            localStorage.setItem('openai_api_key', e.target.value);
+                            addLog('🔑 API ключ сохранен локально');
+                          }}
+                          defaultValue={localStorage.getItem('openai_api_key') || ''}
+                        />
+                        <p className="text-xs text-slate-400">
+                          Ключ хранится только в браузере. Получить можно на{' '}
+                          <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                            platform.openai.com
+                          </a>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex gap-2">
                     <div className="flex-1 relative">
                       <Input
