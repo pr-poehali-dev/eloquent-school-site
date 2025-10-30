@@ -13,6 +13,7 @@ interface Project {
   createdAt: string;
   files: ProjectFile[];
   url?: string;
+  color: string;
 }
 
 interface ProjectFile {
@@ -21,6 +22,15 @@ interface ProjectFile {
   content: string;
   type: 'component' | 'page' | 'style' | 'config';
 }
+
+const projectColors = [
+  'from-purple-500 to-pink-500',
+  'from-blue-500 to-cyan-500',
+  'from-emerald-500 to-teal-500',
+  'from-orange-500 to-red-500',
+  'from-violet-500 to-purple-500',
+  'from-rose-500 to-pink-500',
+];
 
 function SystemTest() {
   const [projects, setProjects] = useState<Project[]>([
@@ -31,9 +41,10 @@ function SystemTest() {
       status: 'deployed',
       createdAt: new Date().toISOString(),
       url: 'https://cafe-landing.example.com',
+      color: projectColors[0],
       files: [
-        { id: 'f1', path: 'src/App.tsx', content: 'import React...', type: 'page' },
-        { id: 'f2', path: 'src/components/Menu.tsx', content: 'export const Menu...', type: 'component' },
+        { id: 'f1', path: 'src/App.tsx', content: 'import React from "react";\n\nfunction App() {\n  return (\n    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100">\n      <header className="py-6 px-4">\n        <h1 className="text-4xl font-bold text-center">Кафе "Уют"</h1>\n      </header>\n    </div>\n  );\n}\n\nexport default App;', type: 'page' },
+        { id: 'f2', path: 'src/components/Menu.tsx', content: 'export const Menu = () => {\n  return <div>Меню</div>;\n};', type: 'component' },
       ]
     },
     {
@@ -42,15 +53,16 @@ function SystemTest() {
       description: 'Многостраничный сайт с формами',
       status: 'active',
       createdAt: new Date().toISOString(),
+      color: projectColors[1],
       files: [
-        { id: 'f3', path: 'src/App.tsx', content: 'import React...', type: 'page' },
+        { id: 'f3', path: 'src/App.tsx', content: 'import React from "react";\n\nfunction App() {\n  return <div>Corporate Site</div>;\n}\n\nexport default App;', type: 'page' },
       ]
     }
   ]);
 
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedFile, setSelectedFile] = useState<ProjectFile | null>(null);
-  const [logs, setLogs] = useState<string[]>(['Система запущена']);
+  const [logs, setLogs] = useState<string[]>(['🚀 Система запущена и готова к работе']);
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [showFileEditor, setShowFileEditor] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -59,7 +71,7 @@ function SystemTest() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const addLog = (message: string) => {
-    setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${message}`, ...prev].slice(0, 100));
+    setLogs(prev => [`${new Date().toLocaleTimeString()} ${message}`, ...prev].slice(0, 100));
   };
 
   const createProject = () => {
@@ -71,11 +83,12 @@ function SystemTest() {
       description: newProjectDescription,
       status: 'active',
       createdAt: new Date().toISOString(),
+      color: projectColors[projects.length % projectColors.length],
       files: [
         {
           id: `f${Date.now()}`,
           path: 'src/App.tsx',
-          content: `function App() {\n  return <div>Hello from ${newProjectName}</div>;\n}\n\nexport default App;`,
+          content: `import React from "react";\n\nfunction App() {\n  return (\n    <div className="min-h-screen">\n      <h1>${newProjectName}</h1>\n    </div>\n  );\n}\n\nexport default App;`,
           type: 'page'
         }
       ]
@@ -86,6 +99,7 @@ function SystemTest() {
     setShowNewProjectDialog(false);
     setNewProjectName('');
     setNewProjectDescription('');
+    setSelectedProject(newProject);
   };
 
   const deleteProject = (projectId: string) => {
@@ -107,14 +121,22 @@ function SystemTest() {
     addLog(`🔨 Начата сборка: ${project.name}`);
 
     setTimeout(() => {
-      setProjects(projects.map(p => 
+      setProjects(prevProjects => prevProjects.map(p => 
         p.id === projectId ? { 
           ...p, 
           status: 'deployed' as const,
-          url: `https://${project.name.toLowerCase().replace(/\s+/g, '-')}.example.com`
+          url: `https://${project.name.toLowerCase().replace(/\s+/g, '-')}.poehali.dev`
         } : p
       ));
-      addLog(`✅ Проект развернут: ${project.name}`);
+      addLog(`🚀 Проект развернут: ${project.name}`);
+      
+      if (selectedProject?.id === projectId) {
+        setSelectedProject(prev => prev ? {
+          ...prev,
+          status: 'deployed',
+          url: `https://${project.name.toLowerCase().replace(/\s+/g, '-')}.poehali.dev`
+        } : null);
+      }
     }, 3000);
   };
 
@@ -122,13 +144,18 @@ function SystemTest() {
     if (!aiPrompt.trim() || !selectedProject) return;
 
     setIsProcessing(true);
-    addLog(`🤖 AI обрабатывает: "${aiPrompt}"`);
+    addLog(`🤖 AI обрабатывает запрос: "${aiPrompt}"`);
 
     setTimeout(() => {
+      const fileName = aiPrompt.toLowerCase().includes('форм') ? 'ContactForm' :
+                       aiPrompt.toLowerCase().includes('кнопк') ? 'Button' :
+                       aiPrompt.toLowerCase().includes('карточ') ? 'Card' :
+                       `Component${Date.now()}`;
+
       const newFile: ProjectFile = {
         id: `f${Date.now()}`,
-        path: `src/components/Generated${Date.now()}.tsx`,
-        content: `// Generated by AI\n// Prompt: ${aiPrompt}\n\nfunction Component() {\n  return <div>AI Generated Component</div>;\n}\n\nexport default Component;`,
+        path: `src/components/${fileName}.tsx`,
+        content: `// Generated by AI\n// Request: ${aiPrompt}\n\nimport React from 'react';\n\ninterface ${fileName}Props {\n  // Add your props here\n}\n\nexport const ${fileName}: React.FC<${fileName}Props> = () => {\n  return (\n    <div className="p-4">\n      <h2>Generated ${fileName}</h2>\n    </div>\n  );\n};\n\nexport default ${fileName};`,
         type: 'component'
       };
 
@@ -138,7 +165,7 @@ function SystemTest() {
           : p
       ));
 
-      addLog(`✅ AI создал файл: ${newFile.path}`);
+      addLog(`✨ AI создал компонент: ${newFile.path}`);
       setAiPrompt('');
       setIsProcessing(false);
       
@@ -164,170 +191,221 @@ function SystemTest() {
     ));
 
     setSelectedFile({ ...selectedFile, content });
-    addLog(`💾 Сохранен файл: ${selectedFile.path}`);
+    addLog(`💾 Сохранен: ${selectedFile.path}`);
+  };
+
+  const getStatusIcon = (status: Project['status']) => {
+    switch(status) {
+      case 'deployed': return { icon: 'CheckCircle2', color: 'text-emerald-400' };
+      case 'building': return { icon: 'Loader2', color: 'text-amber-400 animate-spin' };
+      default: return { icon: 'Circle', color: 'text-slate-400' };
+    }
+  };
+
+  const getFileIcon = (type: ProjectFile['type']) => {
+    switch(type) {
+      case 'component': return 'Box';
+      case 'page': return 'FileText';
+      case 'style': return 'Palette';
+      default: return 'File';
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950">
-      <div className="container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-            <Icon name="Rocket" size={32} />
-            Панель управления проектами
-          </h1>
-          <p className="text-purple-300">AI-платформа для создания и управления веб-проектами</p>
+    <div className="min-h-screen bg-[#0a0a0f] relative overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent"></div>
+      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-40"></div>
+      
+      <div className="relative z-10 container mx-auto px-6 py-8">
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-4 mb-2">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur-xl opacity-50"></div>
+                <div className="relative bg-gradient-to-r from-purple-600 to-pink-600 p-3 rounded-xl">
+                  <Icon name="Rocket" size={28} className="text-white" />
+                </div>
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold text-white tracking-tight">
+                  Project Studio
+                </h1>
+                <p className="text-slate-400 mt-1">AI-powered development platform</p>
+              </div>
+            </div>
+          </div>
+          
+          <Button 
+            onClick={() => setShowNewProjectDialog(true)}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-6 rounded-xl shadow-lg shadow-purple-500/25 transition-all hover:scale-105"
+          >
+            <Icon name="Plus" size={20} className="mr-2" />
+            Новый проект
+          </Button>
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-3">
-            <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <Icon name="FolderGit2" size={20} />
-                  Проекты ({projects.length})
-                </h2>
-                <Button
-                  onClick={() => setShowNewProjectDialog(true)}
-                  size="sm"
-                  className="bg-purple-600 hover:bg-purple-700"
-                >
-                  <Icon name="Plus" size={16} />
-                </Button>
+        <div className="grid lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-3 space-y-4">
+            <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-5 shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-white">Проекты</h2>
+                <div className="px-3 py-1 bg-purple-500/20 rounded-full text-purple-300 text-sm font-medium">
+                  {projects.length}
+                </div>
               </div>
 
-              <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                {projects.map(project => (
-                  <div
-                    key={project.id}
-                    onClick={() => setSelectedProject(project)}
-                    className={`p-3 rounded cursor-pointer transition-all ${
-                      selectedProject?.id === project.id
-                        ? 'bg-purple-600/30 border-purple-400 border'
-                        : 'bg-white/5 hover:bg-white/10 border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between mb-1">
-                      <h3 className="text-white font-medium text-sm truncate flex-1">
-                        {project.name}
-                      </h3>
-                      {project.status === 'building' && (
-                        <Icon name="Loader2" size={16} className="text-yellow-400 animate-spin" />
-                      )}
-                      {project.status === 'deployed' && (
-                        <Icon name="CheckCircle" size={16} className="text-green-400" />
-                      )}
+              <div className="space-y-2 max-h-[520px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                {projects.map(project => {
+                  const statusInfo = getStatusIcon(project.status);
+                  return (
+                    <div
+                      key={project.id}
+                      onClick={() => setSelectedProject(project)}
+                      className={`group relative p-4 rounded-xl cursor-pointer transition-all duration-300 ${
+                        selectedProject?.id === project.id
+                          ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 border-2 border-purple-500/50 shadow-lg shadow-purple-500/20'
+                          : 'bg-white/5 hover:bg-white/10 border-2 border-transparent hover:border-white/20'
+                      }`}
+                    >
+                      <div className={`absolute inset-0 bg-gradient-to-r ${project.color} opacity-0 group-hover:opacity-10 rounded-xl transition-opacity`}></div>
+                      
+                      <div className="relative">
+                        <div className="flex items-start justify-between mb-2">
+                          <h3 className="text-white font-semibold text-sm flex-1 truncate pr-2">
+                            {project.name}
+                          </h3>
+                          <Icon name={statusInfo.icon as any} size={18} className={statusInfo.color} />
+                        </div>
+                        
+                        <p className="text-slate-400 text-xs mb-3 line-clamp-2 leading-relaxed">
+                          {project.description}
+                        </p>
+                        
+                        <div className="flex items-center gap-3 text-xs">
+                          <div className="flex items-center gap-1.5 text-slate-400">
+                            <Icon name="FileCode" size={14} />
+                            <span>{project.files.length}</span>
+                          </div>
+                          {project.url && (
+                            <a 
+                              href={project.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Icon name="ExternalLink" size={14} />
+                              <span>Open</span>
+                            </a>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-purple-300 text-xs mb-2 line-clamp-2">
-                      {project.description}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-purple-400">{project.files.length} файлов</span>
-                      {project.url && (
-                        <a href={project.url} target="_blank" rel="noopener noreferrer" 
-                           className="text-blue-400 hover:underline flex items-center gap-1"
-                           onClick={(e) => e.stopPropagation()}>
-                          <Icon name="ExternalLink" size={12} />
-                        </a>
-                      )}
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-5 shadow-2xl">
+              <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                <Icon name="BarChart3" size={18} />
+                Статистика
+              </h3>
+              <div className="space-y-3">
+                {[
+                  { label: 'Активных', value: projects.filter(p => p.status === 'active').length, color: 'from-blue-500 to-cyan-500' },
+                  { label: 'Развернутых', value: projects.filter(p => p.status === 'deployed').length, color: 'from-emerald-500 to-teal-500' },
+                  { label: 'Файлов', value: projects.reduce((acc, p) => acc + p.files.length, 0), color: 'from-purple-500 to-pink-500' },
+                ].map((stat, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-white/5 rounded-xl">
+                    <span className="text-slate-400 text-sm">{stat.label}</span>
+                    <div className="relative">
+                      <div className={`absolute inset-0 bg-gradient-to-r ${stat.color} blur-lg opacity-30`}></div>
+                      <div className={`relative px-3 py-1 bg-gradient-to-r ${stat.color} rounded-lg text-white font-bold text-sm`}>
+                        {stat.value}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-
-            <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-4 mt-4">
-              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                <Icon name="Activity" size={16} />
-                Статистика
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-purple-300">Активных</span>
-                  <span className="text-white font-medium">
-                    {projects.filter(p => p.status === 'active').length}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-purple-300">Развернутых</span>
-                  <span className="text-white font-medium">
-                    {projects.filter(p => p.status === 'deployed').length}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-purple-300">Всего файлов</span>
-                  <span className="text-white font-medium">
-                    {projects.reduce((acc, p) => acc + p.files.length, 0)}
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
 
-          <div className="lg:col-span-6">
+          <div className="lg:col-span-6 space-y-4">
             {selectedProject ? (
-              <div className="space-y-4">
-                <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h2 className="text-xl font-bold text-white mb-1">
-                        {selectedProject.name}
-                      </h2>
-                      <p className="text-purple-300 text-sm">
-                        {selectedProject.description}
-                      </p>
+              <>
+                <div className="relative bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl overflow-hidden">
+                  <div className={`absolute inset-0 bg-gradient-to-r ${selectedProject.color} opacity-5`}></div>
+                  
+                  <div className="relative">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h2 className="text-2xl font-bold text-white mb-2">
+                          {selectedProject.name}
+                        </h2>
+                        <p className="text-slate-400">
+                          {selectedProject.description}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => buildProject(selectedProject.id)}
+                          disabled={selectedProject.status === 'building'}
+                          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-0 shadow-lg shadow-emerald-500/25"
+                        >
+                          <Icon name="Rocket" size={16} className="mr-1" />
+                          {selectedProject.status === 'building' ? 'Деплой...' : 'Деплой'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => deleteProject(selectedProject.id)}
+                          className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20"
+                        >
+                          <Icon name="Trash2" size={16} />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => buildProject(selectedProject.id)}
-                        disabled={selectedProject.status === 'building'}
-                        className="border-white/20"
-                      >
-                        <Icon name="Rocket" size={16} />
-                        {selectedProject.status === 'building' ? 'Сборка...' : 'Деплой'}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => deleteProject(selectedProject.id)}
-                        className="border-red-500/20 text-red-400 hover:bg-red-500/10"
-                      >
-                        <Icon name="Trash2" size={16} />
-                      </Button>
-                    </div>
-                  </div>
 
-                  {selectedProject.url && (
-                    <a
-                      href={selectedProject.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-blue-400 hover:underline text-sm"
-                    >
-                      {selectedProject.url}
-                      <Icon name="ExternalLink" size={14} />
-                    </a>
-                  )}
+                    {selectedProject.url && (
+                      <a
+                        href={selectedProject.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg text-blue-400 text-sm transition-all"
+                      >
+                        <Icon name="Globe" size={16} />
+                        {selectedProject.url}
+                        <Icon name="ExternalLink" size={14} />
+                      </a>
+                    )}
+                  </div>
                 </div>
 
-                <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-4">
-                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                    <Icon name="Bot" size={20} />
+                <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <div className="p-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg">
+                      <Icon name="Sparkles" size={18} className="text-white" />
+                    </div>
                     AI Ассистент
                   </h3>
                   <div className="flex gap-2">
-                    <Input
-                      value={aiPrompt}
-                      onChange={(e) => setAiPrompt(e.target.value)}
-                      placeholder="Создай форму обратной связи..."
-                      className="flex-1 bg-black/30 border-white/20 text-white"
-                      onKeyDown={(e) => e.key === 'Enter' && processAiRequest()}
-                    />
+                    <div className="flex-1 relative">
+                      <Input
+                        value={aiPrompt}
+                        onChange={(e) => setAiPrompt(e.target.value)}
+                        placeholder="Создай форму обратной связи с полями имя, email, сообщение..."
+                        className="bg-black/20 border-white/10 text-white placeholder:text-slate-500 pr-12 py-6 rounded-xl"
+                        onKeyDown={(e) => e.key === 'Enter' && processAiRequest()}
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">
+                        <Icon name="Command" size={14} />
+                      </div>
+                    </div>
                     <Button
                       onClick={processAiRequest}
                       disabled={isProcessing || !aiPrompt.trim()}
-                      className="bg-purple-600 hover:bg-purple-700"
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 rounded-xl shadow-lg shadow-purple-500/25"
                     >
                       {isProcessing ? (
                         <Icon name="Loader2" size={20} className="animate-spin" />
@@ -338,12 +416,15 @@ function SystemTest() {
                   </div>
                 </div>
 
-                <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-4">
-                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                    <Icon name="FileCode" size={20} />
-                    Файлы ({selectedProject.files.length})
+                <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <Icon name="FolderTree" size={20} />
+                    Файлы проекта
+                    <span className="ml-auto text-sm font-normal text-slate-400">
+                      {selectedProject.files.length} файлов
+                    </span>
                   </h3>
-                  <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                     {selectedProject.files.map(file => (
                       <div
                         key={file.id}
@@ -351,41 +432,56 @@ function SystemTest() {
                           setSelectedFile(file);
                           setShowFileEditor(true);
                         }}
-                        className="p-2 rounded bg-black/20 hover:bg-black/40 cursor-pointer transition-all flex items-center gap-2"
+                        className="group p-4 rounded-xl bg-black/20 hover:bg-black/40 border border-white/5 hover:border-white/10 cursor-pointer transition-all duration-200"
                       >
-                        <Icon 
-                          name={file.type === 'component' ? 'FileCode' : file.type === 'page' ? 'Layout' : 'Palette'} 
-                          size={16} 
-                          className="text-purple-400" 
-                        />
-                        <span className="text-white text-sm font-mono">{file.path}</span>
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-lg group-hover:from-purple-600/30 group-hover:to-pink-600/30 transition-all">
+                            <Icon name={getFileIcon(file.type) as any} size={18} className="text-purple-400" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-white text-sm font-mono font-medium">
+                              {file.path}
+                            </div>
+                            <div className="text-slate-500 text-xs mt-0.5 capitalize">
+                              {file.type}
+                            </div>
+                          </div>
+                          <Icon name="ChevronRight" size={18} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              </div>
+              </>
             ) : (
-              <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-12 text-center">
-                <Icon name="FolderOpen" size={64} className="text-purple-400/50 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-white mb-2">
+              <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-16 shadow-2xl text-center">
+                <div className="relative inline-block mb-6">
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 blur-2xl opacity-20"></div>
+                  <div className="relative p-6 bg-gradient-to-r from-purple-600/10 to-pink-600/10 rounded-2xl">
+                    <Icon name="FolderOpen" size={64} className="text-purple-400" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">
                   Выберите проект
                 </h3>
-                <p className="text-purple-300">
-                  Создайте новый проект или откройте существующий
+                <p className="text-slate-400 max-w-md mx-auto">
+                  Откройте существующий проект из списка или создайте новый для начала работы
                 </p>
               </div>
             )}
           </div>
 
           <div className="lg:col-span-3">
-            <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-4">
-              <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                <Icon name="Terminal" size={20} />
-                Логи
+            <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-5 shadow-2xl sticky top-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Icon name="Activity" size={20} />
+                Логи системы
               </h3>
-              <div className="bg-black/40 rounded p-3 h-[600px] overflow-y-auto font-mono text-xs space-y-1">
+              <div className="bg-black/40 rounded-xl p-4 h-[calc(100vh-240px)] overflow-y-auto font-mono text-xs space-y-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                 {logs.map((log, i) => (
-                  <div key={i} className="text-green-400">{log}</div>
+                  <div key={i} className="text-emerald-400 leading-relaxed opacity-90 hover:opacity-100 transition-opacity">
+                    {log}
+                  </div>
                 ))}
               </div>
             </div>
@@ -394,46 +490,46 @@ function SystemTest() {
       </div>
 
       <Dialog open={showNewProjectDialog} onOpenChange={setShowNewProjectDialog}>
-        <DialogContent className="bg-slate-900 border-white/20">
+        <DialogContent className="bg-[#0f0f1a] border-white/10 backdrop-blur-2xl shadow-2xl max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-white">Создать новый проект</DialogTitle>
-            <DialogDescription className="text-purple-300">
-              Введите название и описание проекта
+            <DialogTitle className="text-white text-xl">Создать новый проект</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Введите информацию о вашем проекте
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 mt-4">
+          <div className="space-y-5 mt-6">
             <div>
-              <label className="text-sm text-purple-300 mb-2 block">Название проекта</label>
+              <label className="text-sm text-slate-300 mb-2 block font-medium">Название</label>
               <Input
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
-                placeholder="Мой крутой проект"
-                className="bg-black/30 border-white/20 text-white"
+                placeholder="Мой новый проект"
+                className="bg-black/20 border-white/10 text-white placeholder:text-slate-600 rounded-xl"
               />
             </div>
             <div>
-              <label className="text-sm text-purple-300 mb-2 block">Описание</label>
+              <label className="text-sm text-slate-300 mb-2 block font-medium">Описание</label>
               <Textarea
                 value={newProjectDescription}
                 onChange={(e) => setNewProjectDescription(e.target.value)}
-                placeholder="Краткое описание проекта..."
-                className="bg-black/30 border-white/20 text-white"
-                rows={3}
+                placeholder="Краткое описание проекта и его целей..."
+                className="bg-black/20 border-white/10 text-white placeholder:text-slate-600 rounded-xl"
+                rows={4}
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3 pt-2">
               <Button
                 onClick={createProject}
-                className="flex-1 bg-purple-600 hover:bg-purple-700"
+                className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl py-6 shadow-lg shadow-purple-500/25"
                 disabled={!newProjectName.trim()}
               >
-                <Icon name="Plus" size={20} />
-                Создать
+                <Icon name="Plus" size={20} className="mr-2" />
+                Создать проект
               </Button>
               <Button
                 onClick={() => setShowNewProjectDialog(false)}
                 variant="outline"
-                className="border-white/20"
+                className="border-white/10 bg-white/5 hover:bg-white/10 text-white rounded-xl px-6"
               >
                 Отмена
               </Button>
@@ -443,19 +539,22 @@ function SystemTest() {
       </Dialog>
 
       <Dialog open={showFileEditor} onOpenChange={setShowFileEditor}>
-        <DialogContent className="bg-slate-900 border-white/20 max-w-3xl">
+        <DialogContent className="bg-[#0f0f1a] border-white/10 backdrop-blur-2xl shadow-2xl max-w-4xl">
           <DialogHeader>
-            <DialogTitle className="text-white font-mono">{selectedFile?.path}</DialogTitle>
-            <DialogDescription className="text-purple-300">
-              Редактировать код файла
+            <DialogTitle className="text-white font-mono flex items-center gap-2">
+              <Icon name="FileCode" size={20} className="text-purple-400" />
+              {selectedFile?.path}
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Редактирование файла проекта
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4">
             <Textarea
               value={selectedFile?.content || ''}
               onChange={(e) => updateFileContent(e.target.value)}
-              className="bg-black/40 border-white/20 text-white font-mono text-sm"
-              rows={20}
+              className="bg-black/40 border-white/10 text-white font-mono text-sm rounded-xl leading-relaxed"
+              rows={24}
             />
           </div>
         </DialogContent>
