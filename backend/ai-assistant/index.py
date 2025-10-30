@@ -157,8 +157,12 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if openai_key and openai_key.startswith('sk-'):
             try:
                 from openai import OpenAI
+                import httpx
                 
-                client = OpenAI(api_key=openai_key)
+                client = OpenAI(
+                    api_key=openai_key,
+                    http_client=httpx.Client()
+                )
                 
                 system_prompt = """Ты опытный React/TypeScript разработчик. 
 Твоя задача - генерировать чистый, современный код компонентов.
