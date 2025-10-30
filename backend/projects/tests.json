@@ -1,0 +1,33 @@
+{
+  "tests": [
+    {
+      "name": "Get all projects",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Create new project",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "id": "test-project-1",
+        "name": "Test Project",
+        "description": "Test description",
+        "status": "active",
+        "color": "from-blue-500 to-cyan-500",
+        "files": [
+          {
+            "id": "file-1",
+            "path": "src/App.tsx",
+            "content": "function App() { return <div>Test</div>; }",
+            "type": "page"
+          }
+        ]
+      },
+      "expectedStatus": 201,
+      "bodyMatcher": "partial"
+    }
+  ]
+}

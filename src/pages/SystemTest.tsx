@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Icon from '@/components/ui/icon';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { api, type Project as ApiProject, type ProjectFile as ApiProjectFile } from '@/lib/api';
 
 interface Project {
   id: string;
@@ -33,33 +34,7 @@ const projectColors = [
 ];
 
 function SystemTest() {
-  const [projects, setProjects] = useState<Project[]>([
-    {
-      id: '1',
-      name: 'Лендинг для кафе',
-      description: 'Простой одностраничный сайт с меню',
-      status: 'deployed',
-      createdAt: new Date().toISOString(),
-      url: 'https://cafe-landing.example.com',
-      color: projectColors[0],
-      files: [
-        { id: 'f1', path: 'src/App.tsx', content: 'import React from "react";\n\nfunction App() {\n  return (\n    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100">\n      <header className="py-6 px-4">\n        <h1 className="text-4xl font-bold text-center">Кафе "Уют"</h1>\n      </header>\n    </div>\n  );\n}\n\nexport default App;', type: 'page' },
-        { id: 'f2', path: 'src/components/Menu.tsx', content: 'export const Menu = () => {\n  return <div>Меню</div>;\n};', type: 'component' },
-      ]
-    },
-    {
-      id: '2',
-      name: 'Корпоративный сайт',
-      description: 'Многостраничный сайт с формами',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      color: projectColors[1],
-      files: [
-        { id: 'f3', path: 'src/App.tsx', content: 'import React from "react";\n\nfunction App() {\n  return <div>Corporate Site</div>;\n}\n\nexport default App;', type: 'page' },
-      ]
-    }
-  ]);
-
+  const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedFile, setSelectedFile] = useState<ProjectFile | null>(null);
   const [logs, setLogs] = useState<string[]>(['🚀 Система запущена и готова к работе']);
@@ -69,49 +44,110 @@ function SystemTest() {
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const addLog = (message: string) => {
     setLogs(prev => [`${new Date().toLocaleTimeString()} ${message}`, ...prev].slice(0, 100));
   };
 
-  const createProject = () => {
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
+    try {
+      addLog('📡 Загрузка проектов из базы данных...');
+      const data = await api.projects.getAll();
+      
+      const projectsWithFiles = await Promise.all(
+        data.map(async (p) => {
+          try {
+            const fullProject = await api.projects.getById(p.id);
+            return {
+              id: fullProject.id,
+              name: fullProject.name,
+              description: fullProject.description || '',
+              status: fullProject.status,
+              createdAt: fullProject.created_at || new Date().toISOString(),
+              url: fullProject.url,
+              color: fullProject.color,
+              files: (fullProject.files || []).map(f => ({
+                id: f.id,
+                path: f.path,
+                content: f.content,
+                type: (f.file_type || 'page') as ProjectFile['type']
+              }))
+            };
+          } catch (err) {
+            return {
+              id: p.id,
+              name: p.name,
+              description: p.description || '',
+              status: p.status,
+              createdAt: p.created_at || new Date().toISOString(),
+              url: p.url,
+              color: p.color,
+              files: []
+            };
+          }
+        })
+      );
+
+      setProjects(projectsWithFiles);
+      addLog(`✅ Загружено ${projectsWithFiles.length} проектов`);
+    } catch (error) {
+      addLog(`❌ Ошибка загрузки: ${error}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createProject = async () => {
     if (!newProjectName.trim()) return;
 
-    const newProject: Project = {
-      id: String(Date.now()),
-      name: newProjectName,
-      description: newProjectDescription,
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      color: projectColors[projects.length % projectColors.length],
-      files: [
-        {
-          id: `f${Date.now()}`,
-          path: 'src/App.tsx',
-          content: `import React from "react";\n\nfunction App() {\n  return (\n    <div className="min-h-screen">\n      <h1>${newProjectName}</h1>\n    </div>\n  );\n}\n\nexport default App;`,
-          type: 'page'
-        }
-      ]
-    };
+    const projectId = String(Date.now());
+    const fileId = `f${Date.now()}`;
+    const color = projectColors[projects.length % projectColors.length];
 
-    setProjects([newProject, ...projects]);
-    addLog(`✅ Создан проект: ${newProjectName}`);
-    setShowNewProjectDialog(false);
-    setNewProjectName('');
-    setNewProjectDescription('');
-    setSelectedProject(newProject);
+    try {
+      addLog(`🔨 Создание проекта: ${newProjectName}`);
+      
+      await api.projects.create({
+        id: projectId,
+        name: newProjectName,
+        description: newProjectDescription,
+        status: 'active',
+        color,
+        files: [
+          {
+            id: fileId,
+            path: 'src/App.tsx',
+            content: `import React from "react";\n\nfunction App() {\n  return (\n    <div className="min-h-screen">\n      <h1>${newProjectName}</h1>\n    </div>\n  );\n}\n\nexport default App;`,
+            type: 'page'
+          }
+        ]
+      });
+
+      addLog(`✅ Проект создан: ${newProjectName}`);
+      await loadProjects();
+      setShowNewProjectDialog(false);
+      setNewProjectName('');
+      setNewProjectDescription('');
+    } catch (error) {
+      addLog(`❌ Ошибка создания: ${error}`);
+    }
   };
 
   const deleteProject = (projectId: string) => {
     const project = projects.find(p => p.id === projectId);
     setProjects(projects.filter(p => p.id !== projectId));
-    addLog(`🗑️ Удален проект: ${project?.name}`);
+    addLog(`🗑️ Удален проект: ${project?.name} (только локально)`);
     if (selectedProject?.id === projectId) {
       setSelectedProject(null);
     }
   };
 
-  const buildProject = (projectId: string) => {
+  const buildProject = async (projectId: string) => {
     const project = projects.find(p => p.id === projectId);
     if (!project) return;
 
@@ -120,24 +156,35 @@ function SystemTest() {
     ));
     addLog(`🔨 Начата сборка: ${project.name}`);
 
-    setTimeout(() => {
-      setProjects(prevProjects => prevProjects.map(p => 
-        p.id === projectId ? { 
-          ...p, 
-          status: 'deployed' as const,
-          url: `https://${project.name.toLowerCase().replace(/\s+/g, '-')}.poehali.dev`
-        } : p
-      ));
-      addLog(`🚀 Проект развернут: ${project.name}`);
-      
-      if (selectedProject?.id === projectId) {
-        setSelectedProject(prev => prev ? {
-          ...prev,
+    try {
+      setTimeout(async () => {
+        const deployUrl = `https://${project.name.toLowerCase().replace(/\s+/g, '-')}.poehali.dev`;
+        
+        await api.projects.update(projectId, {
           status: 'deployed',
-          url: `https://${project.name.toLowerCase().replace(/\s+/g, '-')}.poehali.dev`
-        } : null);
-      }
-    }, 3000);
+          url: deployUrl
+        });
+
+        setProjects(prevProjects => prevProjects.map(p => 
+          p.id === projectId ? { 
+            ...p, 
+            status: 'deployed' as const,
+            url: deployUrl
+          } : p
+        ));
+        addLog(`🚀 Проект развернут: ${project.name}`);
+        
+        if (selectedProject?.id === projectId) {
+          setSelectedProject(prev => prev ? {
+            ...prev,
+            status: 'deployed',
+            url: deployUrl
+          } : null);
+        }
+      }, 3000);
+    } catch (error) {
+      addLog(`❌ Ошибка деплоя: ${error}`);
+    }
   };
 
   const processAiRequest = async () => {
@@ -146,16 +193,28 @@ function SystemTest() {
     setIsProcessing(true);
     addLog(`🤖 AI обрабатывает запрос: "${aiPrompt}"`);
 
-    setTimeout(() => {
+    try {
       const fileName = aiPrompt.toLowerCase().includes('форм') ? 'ContactForm' :
                        aiPrompt.toLowerCase().includes('кнопк') ? 'Button' :
                        aiPrompt.toLowerCase().includes('карточ') ? 'Card' :
                        `Component${Date.now()}`;
 
+      const fileId = `f${Date.now()}`;
+      const filePath = `src/components/${fileName}.tsx`;
+      const fileContent = `// Generated by AI\n// Request: ${aiPrompt}\n\nimport React from 'react';\n\ninterface ${fileName}Props {\n  // Add your props here\n}\n\nexport const ${fileName}: React.FC<${fileName}Props> = () => {\n  return (\n    <div className="p-4">\n      <h2>Generated ${fileName}</h2>\n    </div>\n  );\n};\n\nexport default ${fileName};`;
+
+      await api.files.create({
+        id: fileId,
+        project_id: selectedProject.id,
+        path: filePath,
+        content: fileContent,
+        type: 'component'
+      });
+
       const newFile: ProjectFile = {
-        id: `f${Date.now()}`,
-        path: `src/components/${fileName}.tsx`,
-        content: `// Generated by AI\n// Request: ${aiPrompt}\n\nimport React from 'react';\n\ninterface ${fileName}Props {\n  // Add your props here\n}\n\nexport const ${fileName}: React.FC<${fileName}Props> = () => {\n  return (\n    <div className="p-4">\n      <h2>Generated ${fileName}</h2>\n    </div>\n  );\n};\n\nexport default ${fileName};`,
+        id: fileId,
+        path: filePath,
+        content: fileContent,
         type: 'component'
       };
 
@@ -165,33 +224,42 @@ function SystemTest() {
           : p
       ));
 
-      addLog(`✨ AI создал компонент: ${newFile.path}`);
+      addLog(`✨ AI создал компонент: ${filePath}`);
       setAiPrompt('');
-      setIsProcessing(false);
       
       setSelectedProject(prev => prev ? {
         ...prev,
         files: [...prev.files, newFile]
       } : null);
-    }, 2000);
+    } catch (error) {
+      addLog(`❌ Ошибка AI: ${error}`);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const updateFileContent = (content: string) => {
+  const updateFileContent = async (content: string) => {
     if (!selectedFile || !selectedProject) return;
 
-    setProjects(projects.map(p => 
-      p.id === selectedProject.id 
-        ? {
-            ...p,
-            files: p.files.map(f => 
-              f.id === selectedFile.id ? { ...f, content } : f
-            )
-          }
-        : p
-    ));
+    try {
+      await api.files.update(selectedFile.id, { content });
 
-    setSelectedFile({ ...selectedFile, content });
-    addLog(`💾 Сохранен: ${selectedFile.path}`);
+      setProjects(projects.map(p => 
+        p.id === selectedProject.id 
+          ? {
+              ...p,
+              files: p.files.map(f => 
+                f.id === selectedFile.id ? { ...f, content } : f
+              )
+            }
+          : p
+      ));
+
+      setSelectedFile({ ...selectedFile, content });
+      addLog(`💾 Сохранен: ${selectedFile.path}`);
+    } catch (error) {
+      addLog(`❌ Ошибка сохранения: ${error}`);
+    }
   };
 
   const getStatusIcon = (status: Project['status']) => {
@@ -244,18 +312,33 @@ function SystemTest() {
           </Button>
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-3 space-y-4">
-            <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-5 shadow-2xl">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-white">Проекты</h2>
-                <div className="px-3 py-1 bg-purple-500/20 rounded-full text-purple-300 text-sm font-medium">
-                  {projects.length}
+        {isLoading ? (
+          <div className="flex items-center justify-center h-[60vh]">
+            <div className="text-center">
+              <Icon name="Loader2" size={48} className="text-purple-400 animate-spin mx-auto mb-4" />
+              <p className="text-white text-lg">Загрузка проектов...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-3 space-y-4">
+              <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-5 shadow-2xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-white">Проекты</h2>
+                  <div className="px-3 py-1 bg-purple-500/20 rounded-full text-purple-300 text-sm font-medium">
+                    {projects.length}
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2 max-h-[520px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-                {projects.map(project => {
+                <div className="space-y-2 max-h-[520px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                  {projects.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400">
+                      <Icon name="FolderOpen" size={32} className="mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Нет проектов</p>
+                      <p className="text-xs mt-1">Создайте первый проект</p>
+                    </div>
+                  ) : (
+                    projects.map(project => {
                   const statusInfo = getStatusIcon(project.status);
                   return (
                     <div
@@ -302,7 +385,8 @@ function SystemTest() {
                       </div>
                     </div>
                   );
-                })}
+                })
+              )}
               </div>
             </div>
 
@@ -487,6 +571,7 @@ function SystemTest() {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       <Dialog open={showNewProjectDialog} onOpenChange={setShowNewProjectDialog}>
