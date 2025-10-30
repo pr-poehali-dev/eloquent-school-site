@@ -1,0 +1,15 @@
+{
+  "tests": [
+    {
+      "name": "Generate component without API key",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "prompt": "создай кнопку",
+        "project_id": "test-project-1"
+      },
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}

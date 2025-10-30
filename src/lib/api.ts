@@ -1,6 +1,7 @@
 const API_ENDPOINTS = {
   projects: 'https://functions.poehali.dev/34890564-a51a-4c95-ae0b-e95a2699a7b3',
   files: 'https://functions.poehali.dev/10777aea-79cb-4fdf-a0aa-daf22c226a15',
+  aiAssistant: 'https://functions.poehali.dev/12efab3c-e1d6-498f-8d36-1b727fe476a7',
 };
 
 export interface Project {
@@ -29,6 +30,18 @@ export interface ProjectFile {
 
 export interface ProjectWithFiles extends Project {
   files: ProjectFile[];
+}
+
+export interface AIGenerateResponse {
+  component_name: string;
+  file_path: string;
+  content: string;
+  file_type: string;
+  tokens?: {
+    input: number;
+    output: number;
+  };
+  warning?: string;
 }
 
 export const api = {
@@ -104,6 +117,23 @@ export const api = {
         body: JSON.stringify({ id, ...updates }),
       });
       if (!response.ok) throw new Error('Failed to update file');
+      return response.json();
+    },
+  },
+
+  ai: {
+    generate: async (projectId: string, prompt: string): Promise<AIGenerateResponse> => {
+      const response = await fetch(API_ENDPOINTS.aiAssistant, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: projectId,
+          prompt: prompt,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to generate code');
       return response.json();
     },
   },
