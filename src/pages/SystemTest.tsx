@@ -1,187 +1,465 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+
+interface Project {
+  id: string;
+  name: string;
+  description: string;
+  status: 'active' | 'building' | 'deployed';
+  createdAt: string;
+  files: ProjectFile[];
+  url?: string;
+}
+
+interface ProjectFile {
+  id: string;
+  path: string;
+  content: string;
+  type: 'component' | 'page' | 'style' | 'config';
+}
 
 function SystemTest() {
-  const [projects, setProjects] = useState<Array<{id: string, name: string, status: string}>>([
-    { id: '1', name: 'Проект 1', status: 'active' },
-    { id: '2', name: 'Проект 2', status: 'active' },
+  const [projects, setProjects] = useState<Project[]>([
+    {
+      id: '1',
+      name: 'Лендинг для кафе',
+      description: 'Простой одностраничный сайт с меню',
+      status: 'deployed',
+      createdAt: new Date().toISOString(),
+      url: 'https://cafe-landing.example.com',
+      files: [
+        { id: 'f1', path: 'src/App.tsx', content: 'import React...', type: 'page' },
+        { id: 'f2', path: 'src/components/Menu.tsx', content: 'export const Menu...', type: 'component' },
+      ]
+    },
+    {
+      id: '2',
+      name: 'Корпоративный сайт',
+      description: 'Многостраничный сайт с формами',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      files: [
+        { id: 'f3', path: 'src/App.tsx', content: 'import React...', type: 'page' },
+      ]
+    }
   ]);
-  const [logs, setLogs] = useState<string[]>(['Система готова к работе']);
-  const [testResults, setTestResults] = useState<{[key: string]: boolean}>({});
+
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedFile, setSelectedFile] = useState<ProjectFile | null>(null);
+  const [logs, setLogs] = useState<string[]>(['Система запущена']);
+  const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
+  const [showFileEditor, setShowFileEditor] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDescription, setNewProjectDescription] = useState('');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const addLog = (message: string) => {
-    setLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+    setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${message}`, ...prev].slice(0, 100));
   };
 
-  const testFileOperations = async () => {
-    addLog('Тест: Чтение/запись файлов...');
-    try {
-      const response = await fetch('/api/files/test', { method: 'POST' });
-      const result = await response.json();
-      setTestResults(prev => ({ ...prev, files: response.ok }));
-      addLog(response.ok ? '✅ Файловые операции работают' : '❌ Ошибка файловых операций');
-    } catch (error) {
-      setTestResults(prev => ({ ...prev, files: false }));
-      addLog('❌ Ошибка соединения с API файлов');
+  const createProject = () => {
+    if (!newProjectName.trim()) return;
+
+    const newProject: Project = {
+      id: String(Date.now()),
+      name: newProjectName,
+      description: newProjectDescription,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      files: [
+        {
+          id: `f${Date.now()}`,
+          path: 'src/App.tsx',
+          content: `function App() {\n  return <div>Hello from ${newProjectName}</div>;\n}\n\nexport default App;`,
+          type: 'page'
+        }
+      ]
+    };
+
+    setProjects([newProject, ...projects]);
+    addLog(`✅ Создан проект: ${newProjectName}`);
+    setShowNewProjectDialog(false);
+    setNewProjectName('');
+    setNewProjectDescription('');
+  };
+
+  const deleteProject = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    setProjects(projects.filter(p => p.id !== projectId));
+    addLog(`🗑️ Удален проект: ${project?.name}`);
+    if (selectedProject?.id === projectId) {
+      setSelectedProject(null);
     }
   };
 
-  const testDatabase = async () => {
-    addLog('Тест: Подключение к БД...');
-    try {
-      const response = await fetch('/api/db/test');
-      const result = await response.json();
-      setTestResults(prev => ({ ...prev, database: response.ok }));
-      addLog(response.ok ? '✅ База данных подключена' : '❌ Ошибка БД');
-    } catch (error) {
-      setTestResults(prev => ({ ...prev, database: false }));
-      addLog('❌ Ошибка соединения с БД');
-    }
+  const buildProject = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+
+    setProjects(projects.map(p => 
+      p.id === projectId ? { ...p, status: 'building' as const } : p
+    ));
+    addLog(`🔨 Начата сборка: ${project.name}`);
+
+    setTimeout(() => {
+      setProjects(projects.map(p => 
+        p.id === projectId ? { 
+          ...p, 
+          status: 'deployed' as const,
+          url: `https://${project.name.toLowerCase().replace(/\s+/g, '-')}.example.com`
+        } : p
+      ));
+      addLog(`✅ Проект развернут: ${project.name}`);
+    }, 3000);
   };
 
-  const testAI = async () => {
-    addLog('Тест: AI генерация кода...');
-    try {
-      const response = await fetch('/api/ai/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: 'создай простой компонент кнопки' })
-      });
-      const result = await response.json();
-      setTestResults(prev => ({ ...prev, ai: response.ok }));
-      addLog(response.ok ? '✅ AI работает' : '❌ Ошибка AI');
-    } catch (error) {
-      setTestResults(prev => ({ ...prev, ai: false }));
-      addLog('❌ Ошибка соединения с AI');
-    }
+  const processAiRequest = async () => {
+    if (!aiPrompt.trim() || !selectedProject) return;
+
+    setIsProcessing(true);
+    addLog(`🤖 AI обрабатывает: "${aiPrompt}"`);
+
+    setTimeout(() => {
+      const newFile: ProjectFile = {
+        id: `f${Date.now()}`,
+        path: `src/components/Generated${Date.now()}.tsx`,
+        content: `// Generated by AI\n// Prompt: ${aiPrompt}\n\nfunction Component() {\n  return <div>AI Generated Component</div>;\n}\n\nexport default Component;`,
+        type: 'component'
+      };
+
+      setProjects(projects.map(p => 
+        p.id === selectedProject.id 
+          ? { ...p, files: [...p.files, newFile] }
+          : p
+      ));
+
+      addLog(`✅ AI создал файл: ${newFile.path}`);
+      setAiPrompt('');
+      setIsProcessing(false);
+      
+      setSelectedProject(prev => prev ? {
+        ...prev,
+        files: [...prev.files, newFile]
+      } : null);
+    }, 2000);
   };
 
-  const testGithub = async () => {
-    addLog('Тест: GitHub интеграция...');
-    try {
-      const response = await fetch('/api/github/test');
-      const result = await response.json();
-      setTestResults(prev => ({ ...prev, github: response.ok }));
-      addLog(response.ok ? '✅ GitHub подключен' : '❌ Ошибка GitHub');
-    } catch (error) {
-      setTestResults(prev => ({ ...prev, github: false }));
-      addLog('❌ Ошибка соединения с GitHub');
-    }
-  };
+  const updateFileContent = (content: string) => {
+    if (!selectedFile || !selectedProject) return;
 
-  const runAllTests = () => {
-    setLogs(['Запуск всех тестов...']);
-    setTestResults({});
-    testFileOperations();
-    setTimeout(() => testDatabase(), 500);
-    setTimeout(() => testAI(), 1000);
-    setTimeout(() => testGithub(), 1500);
+    setProjects(projects.map(p => 
+      p.id === selectedProject.id 
+        ? {
+            ...p,
+            files: p.files.map(f => 
+              f.id === selectedFile.id ? { ...f, content } : f
+            )
+          }
+        : p
+    ));
+
+    setSelectedFile({ ...selectedFile, content });
+    addLog(`💾 Сохранен файл: ${selectedFile.path}`);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-            <Icon name="Rocket" size={40} />
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950">
+      <div className="container mx-auto px-4 py-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+            <Icon name="Rocket" size={32} />
             Панель управления проектами
           </h1>
-          <p className="text-purple-200">Тестирование системы разработки через AI</p>
+          <p className="text-purple-300">AI-платформа для создания и управления веб-проектами</p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 mb-6">
-          <div className="bg-white/10 backdrop-blur-lg rounded-lg p-6 border border-white/20">
-            <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-              <Icon name="FolderGit2" size={24} />
-              Проекты
-            </h2>
-            <div className="space-y-2">
-              {projects.map(project => (
-                <div key={project.id} className="bg-white/5 rounded p-3 flex items-center justify-between">
-                  <span className="text-white">{project.name}</span>
-                  <span className="px-2 py-1 bg-green-500/20 text-green-300 rounded text-sm">
-                    {project.status}
+        <div className="grid lg:grid-cols-12 gap-4">
+          <div className="lg:col-span-3">
+            <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Icon name="FolderGit2" size={20} />
+                  Проекты ({projects.length})
+                </h2>
+                <Button
+                  onClick={() => setShowNewProjectDialog(true)}
+                  size="sm"
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  <Icon name="Plus" size={16} />
+                </Button>
+              </div>
+
+              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                {projects.map(project => (
+                  <div
+                    key={project.id}
+                    onClick={() => setSelectedProject(project)}
+                    className={`p-3 rounded cursor-pointer transition-all ${
+                      selectedProject?.id === project.id
+                        ? 'bg-purple-600/30 border-purple-400 border'
+                        : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-1">
+                      <h3 className="text-white font-medium text-sm truncate flex-1">
+                        {project.name}
+                      </h3>
+                      {project.status === 'building' && (
+                        <Icon name="Loader2" size={16} className="text-yellow-400 animate-spin" />
+                      )}
+                      {project.status === 'deployed' && (
+                        <Icon name="CheckCircle" size={16} className="text-green-400" />
+                      )}
+                    </div>
+                    <p className="text-purple-300 text-xs mb-2 line-clamp-2">
+                      {project.description}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-purple-400">{project.files.length} файлов</span>
+                      {project.url && (
+                        <a href={project.url} target="_blank" rel="noopener noreferrer" 
+                           className="text-blue-400 hover:underline flex items-center gap-1"
+                           onClick={(e) => e.stopPropagation()}>
+                          <Icon name="ExternalLink" size={12} />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-4 mt-4">
+              <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+                <Icon name="Activity" size={16} />
+                Статистика
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-purple-300">Активных</span>
+                  <span className="text-white font-medium">
+                    {projects.filter(p => p.status === 'active').length}
                   </span>
                 </div>
-              ))}
+                <div className="flex justify-between">
+                  <span className="text-purple-300">Развернутых</span>
+                  <span className="text-white font-medium">
+                    {projects.filter(p => p.status === 'deployed').length}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-purple-300">Всего файлов</span>
+                  <span className="text-white font-medium">
+                    {projects.reduce((acc, p) => acc + p.files.length, 0)}
+                  </span>
+                </div>
+              </div>
             </div>
-            <button
-              onClick={() => {
-                const newProject = {
-                  id: String(projects.length + 1),
-                  name: `Проект ${projects.length + 1}`,
-                  status: 'active'
-                };
-                setProjects([...projects, newProject]);
-                addLog(`Создан новый проект: ${newProject.name}`);
-              }}
-              className="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded flex items-center justify-center gap-2"
-            >
-              <Icon name="Plus" size={20} />
-              Создать проект
-            </button>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-lg rounded-lg p-6 border border-white/20">
-            <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-              <Icon name="TestTube" size={24} />
-              Тесты системы
-            </h2>
-            <div className="space-y-2 mb-4">
-              {[
-                { key: 'files', label: 'Файловые операции', test: testFileOperations },
-                { key: 'database', label: 'База данных', test: testDatabase },
-                { key: 'ai', label: 'AI генерация', test: testAI },
-                { key: 'github', label: 'GitHub интеграция', test: testGithub },
-              ].map(({ key, label, test }) => (
-                <div key={key} className="flex items-center justify-between bg-white/5 rounded p-3">
-                  <span className="text-white">{label}</span>
-                  <div className="flex items-center gap-2">
-                    {testResults[key] === true && <Icon name="CheckCircle" size={20} className="text-green-400" />}
-                    {testResults[key] === false && <Icon name="XCircle" size={20} className="text-red-400" />}
-                    <button
-                      onClick={test}
-                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded"
+          <div className="lg:col-span-6">
+            {selectedProject ? (
+              <div className="space-y-4">
+                <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h2 className="text-xl font-bold text-white mb-1">
+                        {selectedProject.name}
+                      </h2>
+                      <p className="text-purple-300 text-sm">
+                        {selectedProject.description}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => buildProject(selectedProject.id)}
+                        disabled={selectedProject.status === 'building'}
+                        className="border-white/20"
+                      >
+                        <Icon name="Rocket" size={16} />
+                        {selectedProject.status === 'building' ? 'Сборка...' : 'Деплой'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => deleteProject(selectedProject.id)}
+                        className="border-red-500/20 text-red-400 hover:bg-red-500/10"
+                      >
+                        <Icon name="Trash2" size={16} />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {selectedProject.url && (
+                    <a
+                      href={selectedProject.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-blue-400 hover:underline text-sm"
                     >
-                      Тест
-                    </button>
+                      {selectedProject.url}
+                      <Icon name="ExternalLink" size={14} />
+                    </a>
+                  )}
+                </div>
+
+                <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-4">
+                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                    <Icon name="Bot" size={20} />
+                    AI Ассистент
+                  </h3>
+                  <div className="flex gap-2">
+                    <Input
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      placeholder="Создай форму обратной связи..."
+                      className="flex-1 bg-black/30 border-white/20 text-white"
+                      onKeyDown={(e) => e.key === 'Enter' && processAiRequest()}
+                    />
+                    <Button
+                      onClick={processAiRequest}
+                      disabled={isProcessing || !aiPrompt.trim()}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      {isProcessing ? (
+                        <Icon name="Loader2" size={20} className="animate-spin" />
+                      ) : (
+                        <Icon name="Send" size={20} />
+                      )}
+                    </Button>
                   </div>
                 </div>
-              ))}
+
+                <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-4">
+                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                    <Icon name="FileCode" size={20} />
+                    Файлы ({selectedProject.files.length})
+                  </h3>
+                  <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                    {selectedProject.files.map(file => (
+                      <div
+                        key={file.id}
+                        onClick={() => {
+                          setSelectedFile(file);
+                          setShowFileEditor(true);
+                        }}
+                        className="p-2 rounded bg-black/20 hover:bg-black/40 cursor-pointer transition-all flex items-center gap-2"
+                      >
+                        <Icon 
+                          name={file.type === 'component' ? 'FileCode' : file.type === 'page' ? 'Layout' : 'Palette'} 
+                          size={16} 
+                          className="text-purple-400" 
+                        />
+                        <span className="text-white text-sm font-mono">{file.path}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-12 text-center">
+                <Icon name="FolderOpen" size={64} className="text-purple-400/50 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  Выберите проект
+                </h3>
+                <p className="text-purple-300">
+                  Создайте новый проект или откройте существующий
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="lg:col-span-3">
+            <div className="bg-white/5 backdrop-blur-lg rounded-lg border border-white/10 p-4">
+              <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                <Icon name="Terminal" size={20} />
+                Логи
+              </h3>
+              <div className="bg-black/40 rounded p-3 h-[600px] overflow-y-auto font-mono text-xs space-y-1">
+                {logs.map((log, i) => (
+                  <div key={i} className="text-green-400">{log}</div>
+                ))}
+              </div>
             </div>
-            <button
-              onClick={runAllTests}
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded flex items-center justify-center gap-2"
-            >
-              <Icon name="Play" size={20} />
-              Запустить все тесты
-            </button>
           </div>
-        </div>
-
-        <div className="bg-white/10 backdrop-blur-lg rounded-lg p-6 border border-white/20">
-          <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-            <Icon name="Terminal" size={24} />
-            Логи системы
-          </h2>
-          <div className="bg-black/30 rounded p-4 h-64 overflow-y-auto font-mono text-sm">
-            {logs.map((log, i) => (
-              <div key={i} className="text-green-400 mb-1">{log}</div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-6 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-          <h3 className="text-yellow-300 font-semibold mb-2 flex items-center gap-2">
-            <Icon name="Info" size={20} />
-            Информация о развертывании
-          </h3>
-          <p className="text-yellow-200 text-sm">
-            Эта страница тестирует основные компоненты системы. 
-            Для полноценной работы нужно настроить backend API и подключить необходимые сервисы.
-          </p>
         </div>
       </div>
+
+      <Dialog open={showNewProjectDialog} onOpenChange={setShowNewProjectDialog}>
+        <DialogContent className="bg-slate-900 border-white/20">
+          <DialogHeader>
+            <DialogTitle className="text-white">Создать новый проект</DialogTitle>
+            <DialogDescription className="text-purple-300">
+              Введите название и описание проекта
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm text-purple-300 mb-2 block">Название проекта</label>
+              <Input
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder="Мой крутой проект"
+                className="bg-black/30 border-white/20 text-white"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-purple-300 mb-2 block">Описание</label>
+              <Textarea
+                value={newProjectDescription}
+                onChange={(e) => setNewProjectDescription(e.target.value)}
+                placeholder="Краткое описание проекта..."
+                className="bg-black/30 border-white/20 text-white"
+                rows={3}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={createProject}
+                className="flex-1 bg-purple-600 hover:bg-purple-700"
+                disabled={!newProjectName.trim()}
+              >
+                <Icon name="Plus" size={20} />
+                Создать
+              </Button>
+              <Button
+                onClick={() => setShowNewProjectDialog(false)}
+                variant="outline"
+                className="border-white/20"
+              >
+                Отмена
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showFileEditor} onOpenChange={setShowFileEditor}>
+        <DialogContent className="bg-slate-900 border-white/20 max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-white font-mono">{selectedFile?.path}</DialogTitle>
+            <DialogDescription className="text-purple-300">
+              Редактировать код файла
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            <Textarea
+              value={selectedFile?.content || ''}
+              onChange={(e) => updateFileContent(e.target.value)}
+              className="bg-black/40 border-white/20 text-white font-mono text-sm"
+              rows={20}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
